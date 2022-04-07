@@ -34,7 +34,9 @@ sex_vs_nonsex_race <- df %>% group_by(INTENT_C, RACETH_C) %>% summarise(n=n()) %
                 .names = "{.col}_freq (%)" ))
 ###
 
-
+######################################################
+############### Goodness-of-fit test #################
+######################################################
 create.proportion.table <- function(df, for_var, by_var) {
     df %>% group_by(!! sym(by_var), !! sym(for_var)) %>% summarise(n=n()) %>% 
       pivot_wider(names_from = !! sym(by_var), values_from = n) %>% 
@@ -42,29 +44,49 @@ create.proportion.table <- function(df, for_var, by_var) {
                     .fns = calc.freq.per.col, 
                     .names = "{.col}_prop (%)" )) 
 }
-
-mutate_all(df, ~replace(., is.na(.), 0))
-
-
 create.freq.table <- function(df, for_var, by_var) {
   df %>% group_by(!! sym(by_var), !! sym(for_var)) %>% summarise(n=n()) %>% 
     pivot_wider(names_from = !! sym(by_var), values_from = n) %>% 
-    mutate_all(~replace(., is.na(.), 0.5))
+    mutate_all(~replace(., is.na(.), 0))
 }
 intent_sex <- create.freq.table(df, "SEX", "INTENT_C") 
+fisher.test(intent_sex[,2:3]) # p-value = 0.5977
 
-# create.freq.table(d_2012, "RACETH_C", "INTENT_C")
-
-# what to do with the NAs?  
 intent_age <- create.freq.table(df, "AGEG4_C", "INTENT_C")
+fisher.test(intent_age[,2:3]) # p-value = 0.1134
+
 intent_race <- create.freq.table(df, "RACETH_C", "INTENT_C")
-intent_sex <- create.freq.table(df, "SEX", "INTENT_C") 
+fisher.test(intent_race[,2:3]) # p-value = 0.2883
+
 intent_loc <- create.freq.table(df, "LOC_C", "INTENT_C")
+#bind_rows(summarise_all(., ~ if (is.numeric(.)) colSums(intent_loc[3:5,2:3]) else "pooled"))
+# pooling: street, public, school 
+intent_loc_toAdd <-  c("public_pooled", as.list(as.vector(colSums(intent_loc[3:5, 2:3]))) ) 
+intent_loc_pooled <- rbindlist(list(intent_loc, intent_loc_toAdd))
+fisher.test(intent_loc[,2:3]) # p-value = 0.2495 [all vars]
+fisher.test(intent_loc_pooled[c(1:2, 6:7),2:3]) # p-value = 0.4648 [UNK, home, sports, public_pooled]
+
 intent_bdypt <- create.freq.table(df, "BDYPT", "INTENT_C")
+fisher.test(intent_bdypt[,2:3]) # p-value = 0.8353
+
 intent_disp <- create.freq.table(df, "DISP", "INTENT_C")
+fisher.test(intent_disp[,2:3]) # p-value = 0.3703
+fisher.test(intent_disp[1:2,2:3]) # p-value = 0.1939 [treated/released, hospitalized]
 
 loc_age <- create.freq.table(df, "AGEG4_C", "LOC_C")
+loc_age_pooled <- loc_age %>% mutate(public_pooled=rowSums(loc_age[,4:6]))
+chisq.test(loc_age_pooled[3:12, c(2:3,8)]) # p-value = 0.2744
+chisq.test(loc_age_pooled[4:8, c(2:3,8)])  # p-value = 0.1642
+
 diag_sex <- create.freq.table(df, "DIAG", "SEX")
+
+# didn't get the same number as the ortho paper
+table1_intent_race <- data.frame(sex = c(22446, 6753, 4198, 408), nonsex = c(678767, 410977, 207204, 9539))
+chisq.test(table1_intent_race) # p-value < 2.2e-16
+# but the paper got p-value = 0.015
+# did I use the right test?
+
+
 # apply to other vars...
 
 ### test ###

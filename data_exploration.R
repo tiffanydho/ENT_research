@@ -7,8 +7,8 @@ install.packages('xlsx')
 # library(tidyr)
 # library(tidyselect)
 
-source("my_func.R")
 setwd("C:/Users/user/Documents/ENT_research")
+source("my_func.R")
 filename <- "KimplePatientsWithSi_DATA_LABELS_2021-12-01_0858.xlsx"
 raw_data <- read_excel(file.path("data",filename), sheet = 1,
                        col_names = TRUE, col_types = NULL, na = "", skip = 0)
@@ -117,28 +117,29 @@ data_w_ct_t <- melt(data_w_ct, id.vars = c("Study ID", "sinus", "freq", "ctscore
                     value.name = "values")
 
 
-ggplot(data_w_ct_t,aes(x=freq,y=values,shape=factor(ctscore),color=factor(ctscore)))+
+ct_survey_plot <- ggplot(data_w_ct_t,aes(x=freq,y=values,shape=factor(ctscore),color=factor(ctscore)))+
   geom_point()+
   facet_grid(scores~sinus,scales="free")+
   geom_smooth(method='lm',formula=y~x,se=F)
 
-ggplot(data_w_ct,aes(x=freq,y=rsdi_emo_score,shape=factor(ctscore),color=factor(ctscore)))+
-  geom_point()+
-  facet_wrap(~sinus)+geom_smooth(method='lm',formula=y~x,se=F)
+ggsave(filename = "Plot - CT vs survey scores.pdf", plot = ct_survey_plot)
+dev.off()
 
+#### plotting various scores vs CT score frequency ######
+
+ggplot(data_w_ct,aes(x=freq,y=total_CT_score,shape=factor(ctscore),color=factor(ctscore)))+
+  geom_point()+
+  facet_wrap(~sinus)+geom_smooth(method='lm',formula=y~x,se=F)+
+  scale_fill_discrete(name = "CT score")+
+  labs(x = "Frequency", y = "Total CT Score", 
+       title = "Total CT Score vs CT Score Frequency")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+# switched x & y axis
 ggplot(data_w_ct,aes(x=rsdi_emo_score,y=freq,shape=factor(ctscore),color=factor(ctscore)))+
   geom_point()+
   facet_wrap(~sinus)+geom_smooth(method='lm',formula=y~x,se=F)
 
-
-
-ggplot(data_w_ct,aes(x=freq,y=rsdi_func_score,shape=factor(ctscore),color=factor(ctscore)))+
-  geom_point()+
-  facet_wrap(~sinus)+geom_smooth(method='lm',formula=y~x,se=F)
-
-ggplot(data_w_ct,aes(x=freq,y=aggression_score,shape=factor(ctscore),color=factor(ctscore)))+
-  geom_point()+
-  facet_wrap(~sinus)+geom_smooth(method='lm',formula=y~x,se=F)
 
 ##### scatterplots w/ correlation #####
 plot(processed_data[,c(4, 7:12)], cex=.5, main="full dataset")
@@ -146,14 +147,13 @@ plot(processed_data[,c(4, 7:12)], cex=.5, main="full dataset")
 reg <- function(x, y, col) abline(lm(y~x), col=col)
 
 panel.lm <- function (x, y, col = par("col"), bg = NA, pch = par("pch"),
-                      cex = 1, col.smooth = "red", span = 2/3, iter = 3, ...)  {
+                      cex = 1, col.smooth = "red", span = 2/3, iter = 3, ...){
   points(x, y, pch = pch, col = col, bg = bg, cex = cex)
   ok <- is.finite(x) & is.finite(y)
   if (any(ok)) reg(x[ok], y[ok], col.smooth)
 }
 
-panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
-{
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...){
   usr <- par("usr"); on.exit(par(usr))
   par(usr = c(0, 1, 0, 1))
   
@@ -172,12 +172,14 @@ panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
 #   text(0.5, 0.5, txt, cex = cex.cor * r)
 # }
 
-pairs(processed_data[,c(4, 7:12)], upper.panel = panel.lm,
-      cex = 0.5, pch = 18, col = adjustcolor(4, .4), cex.labels = 1,
+pairs(processed_data[,c(3, 6:11, 26)], upper.panel = panel.lm,
+      cex = 0.6, pch = 20, col = adjustcolor(4, .4), cex.labels = 1,
       font.labels = 2, lower.panel = panel.cor)
 
-pairs(processed_data[,c(4, 7:12)], upper.panel = panel.lm, lower.panel = panel.cor)
+# pairs(processed_data[,c(3, 6:11, 26)], upper.panel = panel.lm, lower.panel = panel.cor)
 
+
+##### plotting outliers ######
 Q <- quantile(processed_data$num_allergies, probs=c(.25, .75), na.rm = TRUE)
 iqr <- IQR(processed_data$num_allergies, na.rm = TRUE)
 upper <- Q[2]+1.5*iqr
@@ -287,18 +289,11 @@ model_testt_t <- lm(log_rsdi_emo_score ~ log_endo_score +num_allergies+
 ols_step_best_subset(model_testt_t)
 
 
-
 ####
-
 ggplot(as.data.frame(log_rsdi_phy_score), aes(x=log_rsdi_phy_score))+
   geom_histogram(aes(y = ..density..)) + 
   geom_density()
 
-
-
-# reasons for this failure: 
-#transformation: log or sqrt
-# try: lasso, ridge
 
 ######################
 # install.packages("writexl")
