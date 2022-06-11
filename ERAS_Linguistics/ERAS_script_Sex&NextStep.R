@@ -31,6 +31,14 @@ data <- rbind(data_f_20, data_m_20, data_f_19, data_m_19) %>%
 data_f <- filter(data, sex == "f")
 data_m <- filter(data, sex == "m")
 
+test <-filter(data, step_1>=240)
+nrow(test) #665 ppl
+
+filter(data, step_2>=240) %>% nrow() #693
+filter(data, step_2>=241) %>% nrow() #678
+filter(data, step_2>=242) %>% nrow() #665
+
+summary(test$step_1)
 ### INDIVIDUAL CYCLE ###
 # data_f <- read_excel(filename, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0)
 # data_m <- read_excel(filename, sheet = 2, col_names = TRUE, col_types = NULL, na = "", skip = 0)
@@ -201,6 +209,12 @@ summary(data$poster) #(0, 46)
 funs <- list(min=min, max=max, median=median, mean=mean, sd=sd)
 sapply(funs, function(x) sapply(data[c(2,3, 6:13)], x, na.rm=TRUE))
 
+# correlation of step 1 and step 2
+cor(data$step_1, data$step_2, method = c("pearson"), use = "complete.obs")
+cor.test(data$step_1, data$step_2)
+#get correlation and p values of all vars against step_1 score
+sapply(data[,c(3, 6:13)],function(x) cor.test(data$step_1, x, method = "pearson", exact = FALSE))
+
 ######### scatter plot of step 1 vs step 2 for combined cycle ######### 
 library(ggh4x) # for minor tick marks
 
@@ -274,8 +288,8 @@ plot_grid(sp_step2, sp_abs, sp_oral, sp_poster, labels=c("A", "B", "C", "D"), nc
 
 
 
-
 ### subset analysis: 3 groups
+library(ggh4x) # for minor tick marks
 #install.packages("devtools")
 library(devtools)
 #install_github("kassambara/easyGgplot2")
@@ -286,22 +300,172 @@ step.data <- data %>% select(step_1, step_2) %>%
   mutate(score_group = ifelse(data$step_1<220, "Low", ifelse(data$step_1>250, "High", "Middle"))) %>% 
   na.omit() %>%  as.data.frame()
 step.data$score_group <- factor(step.data$score_group, levels = c("High", "Middle", "Low")) #rearranage order
-#mtcars$cyl <- as.factor(mtcars$cyl)
-colnames(step.data)[which(names(step.data) == "score_group")] <- "Score Tier"
 
-ggplot2.scatterplot(data=step.data, xName='step_1',yName='step_2', size=2,
-                    groupName="Score Tier", 
-                    groupColors=c('springgreen4','royalblue1','violetred1'),
-                    addRegLine=TRUE, addConfidenceInterval=TRUE, setShapeByGroupName=TRUE,
-                    backgroundColor="white", 
-                    xtitle="Step 1 score", ytitle="Step 2 score",
-                    mainTitle="Step 1 vs Step 2 cutoffs @ 220 and 250")
+step.data.test <- head(step.data)%>%  add_row(step_1=270, step_2=280, score_group="High")
+step.data.test 
+
+gglayer_theme_2 <- list(
+  theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=18), 
+        legend.text = element_text(size = 17),
+        legend.title = element_text(size = 19)),
+  guides(x = "axis_minor", y = "axis_minor"),
+  scale_x_continuous(breaks = seq(from =200, to = 273, by = 10), 
+                     minor_breaks = seq(from = 195, to =273, by = 5))
+)
+
+# plot with hard-coded regression slopes & quadrant labels
+ggplot(step.data, aes(x=step_1, y=step_2))+ 
+  geom_hline(yintercept=240)+geom_vline(xintercept = 240)+
+  geom_point(size = 3, aes(color=score_group, shape=score_group)) +
+  geom_smooth(method=lm, aes(color=score_group, shape=score_group)) +
+  xlab("Step 1 Score") + ylab("Step 2 Score") +
+  xlim(195,273) + ylim(193,282) +
+  # stat_cor(method = "pearson", r.digits = 2, p.accuracy = .001, size = 7, 
+  #          aes(color=score_group, shape=score_group), show.legend = F)+
+  gglayer_theme_2+
+  theme(legend.position = c(0.89, 0.22),
+        legend.background = element_rect(fill=NA) # no white background
+        )+
+  scale_colour_manual(name = "Score Tier",
+                      labels = c("High", "Middle", "Low"),
+                      values = c("indianred1", "limegreen", "steelblue1")) +
+  scale_shape_manual(name = "Score Tier",
+                     labels = c("High", "Middle", "Low"),
+                     values = c(19, 18, 17))+
+  annotate("text",x=200,y=279,
+           label=('Regression Slope'), 
+           color = "black", hjust = 0, size = 6)+
+  annotate("text",x=200,y=274,
+           label=('High Tier: 0.469'), 
+           color = "indianred1", hjust = 0, size = 6)+
+  annotate("text",x=200,y=269,
+           label=('Middle Tier: 0.583'), 
+           color = "limegreen", hjust = 0, size = 6)+
+  annotate("text",x=200,y=264,
+           label=('Low Tier: 0.566'), 
+           color = "steelblue1", hjust = 0, size = 6)+
+  geom_label(aes(x = 239, y = 282, label = "I"), size = 7,
+             label.padding = unit(1.6, "mm"),  fill = "lightgrey", color="white")+
+  geom_label(aes(x = 241.16, y = 282, label = "II"), size = 7,
+             label.padding = unit(1.6, "mm"),  fill = "lightgrey", color="white")+
+  geom_label(aes(x = 238.7, y = 193, label = "III"), size = 7,
+             label.padding = unit(1.4, "mm"),  fill = "lightgrey", color="white")+
+  geom_label(aes(x = 241.45, y = 193, label = "IV"), size = 7,
+               label.padding = unit(1.4, "mm"),  fill = "lightgrey", color="white")
+
+# xlim(195,273) + ylim(193,282)
+  
+# plot with hard-coded regression slopes & quadrant labels 
+# REVERSE legend key to 'low, middle, high' (as opposed to 'high, middle, low')
+step.data.rvs <- data %>% select(step_1, step_2) %>% 
+  mutate(score_group = ifelse(data$step_1<220, "Low", ifelse(data$step_1>250, "High", "Middle"))) %>% 
+  na.omit() %>%  as.data.frame()
+step.data.rvs$score_group <- factor(step.data.rvs$score_group, levels = c("Low", "Middle", "High"))
+
+ggplot(step.data.rvs, aes(x=step_1, y=step_2))+ 
+  geom_hline(yintercept=240)+geom_vline(xintercept = 240)+
+  geom_point(size = 3, aes(color=score_group, shape=score_group)) +
+  geom_smooth(method=lm, aes(color=score_group, shape=score_group)) +
+  xlab("Step 1 Score") + ylab("Step 2 Score") +
+  xlim(195,273) + ylim(193,282) +
+  # stat_cor(method = "pearson", r.digits = 2, p.accuracy = .001, size = 7,
+  #          aes(color=score_group, shape=score_group), show.legend = F)+
+  gglayer_theme_2+
+  theme(legend.position = c(0.89, 0.22)
+       #legend.background = element_rect(fill=NA) # no white background
+  )+
+  scale_colour_manual(name = "Score Tier",
+                      labels = c("Low", "Middle", "High"),
+                      values = c("steelblue1", "limegreen", "indianred1")) +
+  scale_shape_manual(name = "Score Tier",
+                     labels = c("Low", "Middle", "High"),
+                     values = c(19, 18, 17))+
+  annotate("text",x=200,y=279,
+           label=('Regression Slope'), 
+           color = "black", hjust = 0, size = 6)+
+  annotate("text",x=200,y=274,
+           label=('Low Tier: 0.566'), 
+           color = "steelblue1", hjust = 0, size = 6)+
+  annotate("text",x=200,y=269,
+           label=('Middle Tier: 0.583'), 
+           color = "limegreen", hjust = 0, size = 6)+
+  annotate("text",x=200,y=264,
+           label=('High Tier: 0.469'), 
+           color = "indianred1", hjust = 0, size = 6)+
+  geom_label(aes(x = 239, y = 282, label = "I"), size = 7, label.size = NA, fill=NA)+
+  geom_label(aes(x = 241.16, y = 282, label = "II"), size = 7, label.size = NA, fill=NA)+
+  geom_label(aes(x = 238.7, y = 193, label = "III"), size = 7, label.size = NA, fill=NA)+
+  geom_label(aes(x = 241.45, y = 193, label = "IV"), size = 7, label.size = NA, fill=NA)
 
 
 
-ggplot(step.data, aes(x=step_1, y=step_2, color=score_group, shape=score_group))+ 
-  geom_point() +
-  geom_smooth(method=lm)
+# geom_label(aes(x = 239, y = 282, label = "I"), size = 7,
+#            label.padding = unit(1.6, "mm"),  fill = "lightgrey", color="white")+
+#   geom_label(aes(x = 241.16, y = 282, label = "II"), size = 7,
+#              label.padding = unit(1.6, "mm"),  fill = "lightgrey", color="white")+
+#   geom_label(aes(x = 238.7, y = 193, label = "III"), size = 7,
+#              label.padding = unit(1.4, "mm"),  fill = "lightgrey", color="white")+
+#   geom_label(aes(x = 241.45, y = 193, label = "IV"), size = 7,
+#              label.padding = unit(1.4, "mm"),  fill = "lightgrey", color="white")
+
+#https://stackoverflow.com/questions/7549694/add-regression-line-equation-and-r2-on-graph
+library(ggpmisc) # with regression equation on plot
+ggplot(data = step.data, aes(x = step_1, y = step_2, colour = score_group)) +
+  stat_poly_line() +
+  stat_poly_eq(aes(label = paste(after_stat(eq.label),
+                                 after_stat(rr.label), sep = "*\", \"*"))) +
+  geom_point()
+  
+
+ggplot(data = step.data, aes(x = step_1, y = step_2, colour = score_group)) +
+  geom_point()+
+  stat_smooth(method="lm")+
+  annotate("text",x=200,y=260,
+           label=("Regression Slopes\n High: 0.469 \n Middle: 0.583 \n Low: 0.566"), 
+           hjust = 0)
+
+
+
+  
+ggplot(step.data, aes(x=step_1, y=step_2))+ 
+  geom_point(size = 3) +
+  geom_smooth(method=lm) +  
+  xlab("Step 1 Score") + ylab("Step 2 Score") +
+  xlim(195,273) + ylim(193,282) +
+  stat_cor(method = "pearson", r.digits = 2, p.accuracy = .001, size = 7)+
+  gglayer_theme_2+
+  theme(legend.position = c(0.89, 0.22)
+        #legend.background = element_rect(fill=NA) # no white background
+  )+
+  scale_colour_manual(name = "Score Tier",
+                      labels = c("High", "Middle", "Low"),
+                      values = c("indianred1", "limegreen", "steelblue1")) +
+  scale_shape_manual(name = "Score Tier",
+                     labels = c("High", "Middle", "Low"),
+                     values = c(19, 18, 17))+
+  geom_hline(yintercept=240, linetype="dotted", color = "red", size = 1)+
+  geom_vline(xintercept = 240, linetype="dotted", color = "red", size = 1)
+  
+
+  
+#https://stackoverflow.com/questions/12410908/combine-legends-for-color-and-shape-into-a-single-legend
+  
+
+# 
+# ggplot2.scatterplot(data=step.data, xName='step_1',yName='step_2', size=2,
+#                     groupName="Score Tier", 
+#                     groupColors=c('springgreen4','royalblue1','violetred1'),
+#                     addRegLine=TRUE, addConfidenceInterval=TRUE, setShapeByGroupName=TRUE,
+#                     backgroundColor="white", 
+#                     xtitle="Step 1 score", ytitle="Step 2 score",
+#                     mainTitle="Step 1 vs Step 2 cutoffs @ 220 and 250")
+
+
+
+
+  
+
 ### start here ### 5/23/22
 
 ggplot2.scatterplot(data=step.data, xName='step_1',yName='step_2', size=2,
